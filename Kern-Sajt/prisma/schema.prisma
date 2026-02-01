@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  BASIC
+  PRO_SELLER
+  SERVICER
+  ADMIN
+}
+
+enum ListingCategory {
+  COMPUTER
+  COMPONENT
+  PERIPHERAL
+  OTHER
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  EXPIRED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  role          UserRole  @default(BASIC)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Gamification & Trust
+  badges        String[]  // e.g. ["VERIFIED", "HARDWARE_GURU"]
+  rating        Float     @default(0.0)
+  reviewCount   Int       @default(0)
+
+  // Relations
+  listings      Listing[]
+  services      Service?  // One service profile per user (if role is SERVICER)
+  reviewsGiven  Review[]  @relation("Reviewer")
+  reviewsReceived Review[] @relation("Reviewee")
+}
+
+model Listing {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  price       Decimal         @db.Decimal(10, 2)
+  currency    String          @default("BAM") // BAM, EUR, RSD
+  category    ListingCategory
+  status      ListingStatus   @default(ACTIVE)
+  
+  // Tech Specs (Mandatory/Optional based on category)
+  cpu         String?
+  gpu         String?
+  ram         String?
+  storage     String? // SSD/HDD
+  motherboard String?
+  psu         String? // Power Supply
+  
+  // Images
+  images      String[]
+
+  // Relations
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([category])
+  @@index([price])
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  address     String
+  city        String
+  latitude    Float?
+  longitude   Float?
+  phone       String?
+  website     String?
+  
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Review {
+  id          String    @id @default(cuid())
+  rating      Int       // 1-5
+  comment     String?
+  
+  reviewerId  String
+  reviewer    User      @relation("Reviewer", fields: [reviewerId], references: [id])
+  
+  revieweeId  String
+  reviewee    User      @relation("Reviewee", fields: [revieweeId], references: [id])
+
+  listingId   String?   // Optional: link to a specific transaction
+  
+  createdAt   DateTime  @default(now())
+}
